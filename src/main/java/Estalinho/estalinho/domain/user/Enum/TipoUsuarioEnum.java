@@ -1,4 +1,7 @@
 package Estalinho.estalinho.domain.user.Enum;
 
-public enum TipoUsuario {
+public enum TipoUsuarioEnum {
+    PACIENTE,
+    ADMINISTRADOR,
+    MEDICO
 }

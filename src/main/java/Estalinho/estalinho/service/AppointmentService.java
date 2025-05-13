@@ -13,6 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -63,24 +66,45 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
-    public void validAppointmentDate(long idPaciente, long idMedico, LocalDate appointmentDate) {
+    public void validAppointmentDate(long idPaciente, long idMedico, LocalDateTime appointmentDate) {
         if(idPaciente == 0) throw new InvalidParameterException("Ops, informe um paciente para a consulta!");
         if(idMedico == 0) throw new InvalidParameterException("Ops, informe um medico para a consulta!");
-        if(appointmentDate.isBefore(LocalDate.now())) throw new InvalidParameterException("Ops, essa data já passou. Insira uma data valida para sua consulta!");
+        if(appointmentDate.isBefore(LocalDateTime.now())) throw new InvalidParameterException("Ops, essa data já passou. Insira uma data valida para sua consulta!");
 
-        boolean existAppointment = appointmentRepository.existsByDataConsultaAndFkPaciente(appointmentDate, idPaciente);
-        if (existAppointment) throw new AlreadyExistException("Esse paciente já tem uma consulta marcada nesse dia!");
+        LocalDateTime startRange = appointmentDate.minusHours(1);
+        LocalDateTime endRange = appointmentDate.plusHours(1);
+        boolean medicoConflito = appointmentRepository.existsByDataConsultaBetweenAndFkMedico(startRange,endRange,idMedico);
+        boolean pacienteConflito = appointmentRepository.existsByDataConsultaBetweenAndFkPaciente(startRange,endRange,idPaciente);
+        if (medicoConflito) throw new AlreadyExistException("Ops, o medico está indisponivel nessa data. Informe outra data para sua consulta ou escolha outro medico!");
+        if (pacienteConflito) throw new AlreadyExistException("Ops, você já tem uma consulta marcada para esse horario!");
+    }
 
-        List<AppointmentResponseDTO> appointmentsMedico = findingAppointmentsByMedico(idMedico);
-        boolean hasAppointment = appointmentsMedico.stream().anyMatch(app -> app.getDataConsulta().equals(appointmentDate));
-        if(hasAppointment)
-            throw new InvalidParameterException("Ops, o medico está indisponivel nessa data. Informe outra data para sua consulta ou escolha outro medico!");
+
+    public Optional<Appointment> findNearestAppointment(LocalDateTime newAppointmentDate) {
+        List<Appointment> nearbyAppointments = appointmentRepository
+                .findByDataConsultaBetween(
+                        newAppointmentDate.minusHours(1),
+                        newAppointmentDate.plusHours(1)
+                );
+
+        if (nearbyAppointments.isEmpty()) {
+            return Optional.empty();
+        }
+
+        nearbyAppointments.sort(Comparator.comparing(
+                app -> Math.abs(
+                        ChronoUnit.MINUTES.between(app.getDataConsulta(), newAppointmentDate)
+                )
+        ));
+
+        return Optional.of(nearbyAppointments.get(0));
     }
 
 
     public boolean create(Appointment appointment) {
         if (appointment == null) throw new InvalidParameterException("Verifique se todos os campos foram preechidos!");
         if(!userService.findById(appointment.getFkMedico()).get().getTipoUsuarioEnum().equals(TipoUsuarioEnum.MEDICO)) throw new InvalidParameterException("Ops, esse medico não existe!");
+        if(!isWithinWorkingHours(appointment.getDataConsulta())) throw new InvalidParameterException("A clinica opera entre 8h e 20h, verifique se a sua consulta foi marcada para um horario valido!");
         validAppointmentDate(appointment.getFkPaciente(), appointment.getFkMedico(), appointment.getDataConsulta());
 
         appointment.setDataInclusao(LocalDate.now());
@@ -89,9 +113,16 @@ public class AppointmentService {
         return true;
     }
 
+    public boolean isWithinWorkingHours(LocalDateTime dateTime) {
+        int hour = dateTime.getHour();
+        return hour >= 8 && hour < 19;
+    }
+
     public boolean updateOne(Appointment appointment) {
         Optional<Appointment> findedAppointment = appointmentRepository.findById(appointment.getId());
         if(findedAppointment.isEmpty()) throw new NotFoundException("Ops, essa consulta não foi encontrada!");
+        if(!isWithinWorkingHours(appointment.getDataConsulta())) throw new InvalidParameterException("A clinica opera entre 8 e 20, verifique se a sua consulta foi marcada para um horario valido!");
+
         Appointment appointmentToUpdate = findedAppointment.get();
 
         if(appointment.getDataConsulta() != null)

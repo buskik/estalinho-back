@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
@@ -17,7 +18,7 @@ public class AppointmentResponseDTO {
     private long id;
     private long fkMedico;
     private long fkPaciente;
-    private LocalDate dataConsulta;
+    private LocalDateTime dataConsulta;
     private EstadoConsultaEnum estadoConsultaEnum;
     private LocalDate dataInclusao;
     private LocalDate dataAlteracao;

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Table(name = "TB_CONSULTAS")
 @Entity(name = "TB_CONSULTAS")
@@ -23,7 +24,7 @@ public class Appointment {
     @NotNull(message = "Preecha o campo 'FkPaciente'")
     private long fkPaciente;
     @NotNull(message = "Preecha o campo 'Data de Consulta'")
-    private LocalDate dataConsulta;
+    private LocalDateTime dataConsulta;
     private EstadoConsultaEnum estadoConsultaEnum;
     @NotNull(message = "Preecha o campo 'Data de Inclusão'")
     private LocalDate dataInclusao;
